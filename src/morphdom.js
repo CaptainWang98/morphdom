@@ -23,6 +23,7 @@ export default function morphdomFactory(morphAttrs) {
       options = {};
     }
 
+    // EdgeCase: fromNode is <document>/<html>/<body>
     if (typeof toNode === 'string') {
       if (fromNode.nodeName === '#document' || fromNode.nodeName === 'HTML' || fromNode.nodeName === 'BODY') {
         var toNodeHtml = toNode;
@@ -130,6 +131,7 @@ export default function morphdomFactory(morphAttrs) {
     //     }
     // }
 
+    // Record node.children into fromNodesLookup
     function indexTree(node) {
       if (node.nodeType === ELEMENT_NODE || node.nodeType === DOCUMENT_FRAGMENT_NODE) {
         var curChild = node.firstChild;
@@ -199,6 +201,7 @@ export default function morphdomFactory(morphAttrs) {
     function morphEl(fromEl, toEl, childrenOnly) {
       var toElKey = getNodeKey(toEl);
 
+      // 如果是原地变形，则不需要缓存，否则会出错？
       if (toElKey) {
         // If an element with an ID is being morphed then it will be in the final
         // DOM so clear it out of the saved elements collection
@@ -209,8 +212,10 @@ export default function morphdomFactory(morphAttrs) {
         // optional
         var beforeUpdateResult = onBeforeElUpdated(fromEl, toEl);
         if (beforeUpdateResult === false) {
+          // 提前结束，跳过 morph
           return;
         } else if (beforeUpdateResult instanceof HTMLElement) {
+          // 自定义渲染，不经过 morph
           fromEl = beforeUpdateResult;
           // reindex the new fromEl in case it's not in the same
           // tree as the original fromEl
@@ -273,6 +278,7 @@ export default function morphdomFactory(morphAttrs) {
             if (curFromNodeType === ELEMENT_NODE) {
               // Both nodes being compared are Element nodes
 
+              // 带 key 的情况
               if (curToNodeKey) {
                 // The target node has a key so we want to match it up with the correct element
                 // in the original DOM tree
@@ -320,10 +326,12 @@ export default function morphdomFactory(morphAttrs) {
                   }
                 }
               } else if (curFromNodeKey) {
+                // 如果toNode没有key，而fromNode有key，说明是两个不同的节点，不兼容
                 // The original has a key
                 isCompatible = false;
               }
 
+              // 名字相同，且带key时兼容
               isCompatible = isCompatible !== false && compareNodeNames(curFromNodeChild, curToNodeChild);
               if (isCompatible) {
                 // We found compatible DOM elements so transform
@@ -411,11 +419,13 @@ export default function morphdomFactory(morphAttrs) {
     var morphedNodeType = morphedNode.nodeType;
     var toNodeType = toNode.nodeType;
 
+    // 处理节点类型变化情况：直接删旧节点
     if (!childrenOnly) {
       // Handle the case where we are given two DOM nodes that are not
       // compatible (e.g. <div> --> <span> or <div> --> TEXT)
       if (morphedNodeType === ELEMENT_NODE) {
         if (toNodeType === ELEMENT_NODE) {
+          // If not the same element, discard old node
           if (!compareNodeNames(fromNode, toNode)) {
             onNodeDiscarded(fromNode);
             morphedNode = moveChildren(fromNode, createElementNS(toNode.nodeName, toNode.namespaceURI));
@@ -443,6 +453,7 @@ export default function morphdomFactory(morphAttrs) {
       // toss out the "from node" and use the "to node"
       onNodeDiscarded(fromNode);
     } else {
+      // 处理 空格 情况
       if (toNode.isSameNode && toNode.isSameNode(morphedNode)) {
         return;
       }
